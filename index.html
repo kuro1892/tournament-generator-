@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スカッシュトーナメント表作成ツール</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.8);
+            border-bottom: 1px solid #eee;
+        }
+
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-group label {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9em;
+        }
+
+        input, select, button {
+            padding: 12px 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #45a049, #3d8b40);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+
+        .players-section {
+            padding: 30px;
+        }
+
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .player-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .player-input span {
+            font-weight: 600;
+            color: #495057;
+            min-width: 60px;
+        }
+
+        .tournament-display {
+            padding: 30px;
+            background: #f8f9fa;
+            overflow-x: auto;
+        }
+
+        .tournament-bracket {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+        }
+
+        .round {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            margin: 0 20px;
+            min-height: 400px;
+        }
+
+        .match {
+            display: flex;
+            flex-direction: column;
+            margin: 10px 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            min-width: 200px;
+        }
+
+        .player {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+
+        .player:last-child {
+            border-bottom: none;
+        }
+
+        .player:hover {
+            background: #f8f9fa;
+        }
+
+        .seed-number {
+            background: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .bye {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .round-label {
+            text-align: center;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 15px;
+            padding: 8px 16px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .connecting-line {
+            width: 20px;
+            height: 2px;
+            background: #dee2e6;
+            align-self: center;
+        }
+
+        .info-panel {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .info-panel h3 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-panel p {
+            color: #424242;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .players-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tournament-bracket {
+                flex-direction: column;
+                gap: 30px;
+            }
+            
+            .round {
+                min-height: auto;
+            }
+        }
+
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .success {
+            color: #155724;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎾 スカッシュトーナメント表作成ツール</h1>
+            <p>プロフェッショナルなトーナメント表を簡単作成</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="input-group">
+                    <label for="playerCount">参加人数</label>
+                    <input type="number" id="playerCount" min="4" max="64" value="8" onchange="updatePlayerInputs()">
+                </div>
+                
+                <div class="input-group">
+                    <label for="tournamentName">大会名</label>
+                    <input type="text" id="tournamentName" value="スカッシュトーナメント" placeholder="大会名を入力">
+                </div>
+                
+                <button class="btn-primary" onclick="generateTournament()">トーナメント表作成</button>
+                <button class="btn-secondary" onclick="clearAll()">クリア</button>
+            </div>
+            
+            <div class="info-panel">
+                <h3>ℹ️ 使い方</h3>
+                <p>1. 参加人数を入力 → 2. 選手名を入力（強い順に入力してください） → 3. トーナメント表作成ボタンを押す</p>
+                <p><strong>シード配置:</strong> 1-4シードは4隅に配置され、強い選手と弱い選手が当たるように自動調整されます。</p>
+            </div>
+        </div>
+
+        <div class="players-section">
+            <h2>選手名入力（強い順に入力）</h2>
+            <div class="players-grid" id="playersGrid">
+                <!-- プレイヤー入力フィールドがここに動的生成されます -->
+            </div>
+        </div>
+
+        <div class="tournament-display" id="tournamentDisplay" style="display: none;">
+            <h2 id="tournamentTitle">トーナメント表</h2>
+            <div class="tournament-bracket" id="tournamentBracket">
+                <!-- トーナメント表がここに生成されます -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let players = [];
+        let tournamentData = null;
+
+        // 参加人数に応じてプレイヤー入力フィールドを更新
+        function updatePlayerInputs() {
+            const playerCount = parseInt(document.getElementById('playerCount').value);
+            const playersGrid = document.getElementById('playersGrid');
+            playersGrid.innerHTML = '';
+
+            for (let i = 0; i < playerCount; i++) {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player-input';
+                
+                const seedLabel = document.createElement('span');
+                seedLabel.textContent = `${i + 1}位:`;
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = `選手名 ${i + 1}`;
+                input.id = `player${i}`;
+                
+                playerDiv.appendChild(seedLabel);
+                playerDiv.appendChild(input);
+                playersGrid.appendChild(playerDiv);
+            }
+        }
+
+        // ドローサイズ（2の累乗）を計算
+        function getDrawSize(playerCount) {
+            return Math.pow(2, Math.ceil(Math.log2(playerCount)));
+        }
+
+        // シード配置を決定
+        function generateSeedPositions(playerCount) {
+            const drawSize = getDrawSize(playerCount);
+            const positions = new Array(drawSize).fill(null);
+            
+            // 基本的なシード配置（4隅）
+            if (playerCount >= 1) positions[0] = 1;                    // 1シード: 1番目
+            if (playerCount >= 2) positions[drawSize - 1] = 2;         // 2シード: 最後
+            if (playerCount >= 3) positions[drawSize / 2 - 1] = 3;     // 3シード: 中間の上
+            if (playerCount >= 4) positions[drawSize / 2] = 4;         // 4シード: 中間の下
+
+            // 5-8シードの配置
+            if (playerCount >= 5) positions[drawSize / 4 - 1] = 5;
+            if (playerCount >= 6) positions[drawSize * 3 / 4 - 1] = 6;
+            if (playerCount >= 7) positions[drawSize / 4] = 7;
+            if (playerCount >= 8) positions[drawSize * 3 / 4] = 8;
+
+            // 残りのシードをランダムに配置
+            const availablePositions = [];
+            for (let i = 0; i < drawSize; i++) {
+                if (positions[i] === null) {
+                    availablePositions.push(i);
+                }
+            }
+
+            // Fisher-Yates shuffle
+            for (let i = availablePositions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availablePositions[i], availablePositions[j]] = [availablePositions[j], availablePositions[i]];
+            }
+
+            // 残りの選手を配置
+            let availableIndex = 0;
+            for (let seed = 9; seed <= playerCount; seed++) {
+                if (availableIndex < availablePositions.length) {
+                    positions[availablePositions[availableIndex]] = seed;
+                    availableIndex++;
+                }
+            }
+
+            return positions;
+        }
+
+        // トーナメント表を生成
+        function generateTournament() {
+            const playerCount = parseInt(document.getElementById('playerCount').value);
+            const tournamentName = document.getElementById('tournamentName').value;
+            
+            // 選手名を取得
+            players = [];
+            for (let i = 0; i < playerCount; i++) {
+                const playerName = document.getElementById(`player${i}`).value.trim();
+                players.push(playerName || `選手${i + 1}`);
+            }
+
+            // シード配置を生成
+            const drawSize = getDrawSize(playerCount);
+            const seedPositions = generateSeedPositions(playerCount);
+            
+            // ドロー配置を作成
+            const draw = new Array(drawSize);
+            for (let i = 0; i < drawSize; i++) {
+                if (seedPositions[i] !== null && seedPositions[i] <= playerCount) {
+                    draw[i] = {
+                        name: players[seedPositions[i] - 1],
+                        seed: seedPositions[i]
+                    };
+                } else {
+                    draw[i] = { name: 'BYE', seed: null };
+                }
+            }
+
+            // トーナメント表を表示
+            displayTournament(draw, tournamentName);
+        }
+
+        // トーナメント表を表示
+        function displayTournament(draw, tournamentName) {
+            const tournamentDisplay = document.getElementById('tournamentDisplay');
+            const tournamentTitle = document.getElementById('tournamentTitle');
+            const tournamentBracket = document.getElementById('tournamentBracket');
+            
+            tournamentTitle.textContent = tournamentName;
+            tournamentDisplay.style.display = 'block';
+            
+            // ブラケットをクリア
+            tournamentBracket.innerHTML = '';
+            
+            const rounds = Math.log2(draw.length);
+            let currentRoundMatches = [...draw];
+            
+            for (let round = 0; round < rounds; round++) {
+                const roundDiv = document.createElement('div');
+                roundDiv.className = 'round';
+                
+                const roundLabel = document.createElement('div');
+                roundLabel.className = 'round-label';
+                roundLabel.textContent = getRoundName(rounds - round, draw.length);
+                roundDiv.appendChild(roundLabel);
+                
+                const matchesInRound = currentRoundMatches.length / 2;
+                const nextRoundMatches = [];
+                
+                for (let i = 0; i < matchesInRound; i++) {
+                    const player1 = currentRoundMatches[i * 2];
+                    const player2 = currentRoundMatches[i * 2 + 1];
+                    
+                    const matchDiv = document.createElement('div');
+                    matchDiv.className = 'match';
+                    
+                    const player1Div = createPlayerElement(player1);
+                    const player2Div = createPlayerElement(player2);
+                    
+                    matchDiv.appendChild(player1Div);
+                    matchDiv.appendChild(player2Div);
+                    roundDiv.appendChild(matchDiv);
+                    
+                    // 次のラウンドの準備（勝者は未定）
+                    nextRoundMatches.push({ name: '', seed: null });
+                }
+                
+                tournamentBracket.appendChild(roundDiv);
+                
+                // 接続線を追加（最終ラウンド以外）
+                if (round < rounds - 1) {
+                    const lineDiv = document.createElement('div');
+                    lineDiv.className = 'connecting-line';
+                    tournamentBracket.appendChild(lineDiv);
+                }
+                
+                currentRoundMatches = nextRoundMatches;
+            }
+            
+            // 最終結果をスクロール表示
+            tournamentDisplay.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // プレイヤー要素を作成
+        function createPlayerElement(player) {
+            const playerDiv = document.createElement('div');
+            playerDiv.className = 'player';
+            
+            if (player.name === 'BYE') {
+                playerDiv.classList.add('bye');
+                playerDiv.textContent = 'BYE';
+            } else {
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = player.name;
+                
+                playerDiv.appendChild(nameSpan);
+                
+                if (player.seed && player.seed <= 8) {
+                    const seedSpan = document.createElement('span');
+                    seedSpan.className = 'seed-number';
+                    seedSpan.textContent = `${player.seed}`;
+                    playerDiv.appendChild(seedSpan);
+                }
+            }
+            
+            return playerDiv;
+        }
+
+        // ラウンド名を取得
+        function getRoundName(roundsLeft, totalPlayers) {
+            if (roundsLeft === 1) return '決勝';
+            if (roundsLeft === 2) return '準決勝';
+            if (roundsLeft === 3) return '準々決勝';
+            if (roundsLeft === 4) return 'ベスト16';
+            if (roundsLeft === 5) return 'ベスト32';
+            return `${Math.pow(2, roundsLeft)}回戦`;
+        }
+
+        // 全てをクリア
+        function clearAll() {
+            const inputs = document.querySelectorAll('input[type="text"]');
+            inputs.forEach(input => input.value = '');
+            
+            const tournamentDisplay = document.getElementById('tournamentDisplay');
+            tournamentDisplay.style.display = 'none';
+            
+            document.getElementById('playerCount').value = 8;
+            updatePlayerInputs();
+        }
+
+        // 初期化
+        updatePlayerInputs();
+    </script>
+</body>
+</html>
