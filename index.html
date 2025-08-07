@@ -508,10 +508,21 @@
                 </div>
             </div>
 
-            <div class="input-group">
+            <div class="input-group btn-group">
                 <button class="btn" onclick="generateTournament()">トーナメント表作成</button>
-                <button class="btn btn-secondary" onclick="exportTournament()">PDF出力</button>
+                <button class="btn btn-secondary" onclick="exportTournament()">エクスポート</button>
                 <button class="btn btn-secondary" onclick="resetTournament()">リセット</button>
+                <button class="btn btn-secondary" onclick="shareOnMobile()" id="shareBtn" style="display: none;">共有</button>
+            </div>
+            
+            <div id="mobileExportInfo" class="mobile-export-info">
+                <h4>📱 モバイルでのエクスポート方法</h4>
+                <ul>
+                    <li><strong>エクスポート</strong>ボタンでHTMLファイルをダウンロード</li>
+                    <li>ダウンロードしたHTMLファイルをブラウザで開く</li>
+                    <li>ブラウザの共有機能でPDF化や印刷が可能</li>
+                    <li><strong>共有</strong>ボタンで他のアプリに直接共有</li>
+                </ul>
             </div>
         </div>
 
@@ -561,52 +572,150 @@
 
         // 初期化
         document.addEventListener('DOMContentLoaded', function() {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('tournamentDate').value = today;
-            updatePlayerInputs();
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('tournamentDate').value = today;
+                updatePlayerInputs();
+                
+                // モバイルデバイスの場合は共有ボタンとガイドを表示
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                if (isMobile) {
+                    document.getElementById('mobileExportInfo').classList.add('show');
+                    if (navigator.share) {
+                        document.getElementById('shareBtn').style.display = 'inline-block';
+                    }
+                }
+            } catch (error) {
+                console.error('初期化エラー:', error);
+                showError('初期化中にエラーが発生しました: ' + error.message);
+            }
         });
 
-        function updatePlayerInputs() {
-            const count = parseInt(document.getElementById('playerCount').value);
-            const grid = document.getElementById('playersGrid');
-            grid.innerHTML = '';
+        function shareOnMobile() {
+            try {
+                if (!navigator.share) {
+                    showError('この端末では共有機能がサポートされていません。');
+                    return;
+                }
 
-            for (let i = 1; i <= count; i++) {
-                const playerDiv = document.createElement('div');
-                playerDiv.className = 'player-input';
-                playerDiv.innerHTML = `
-                    <span>${i}.</span>
-                    <input type="text" id="player${i}" placeholder="選手名" onchange="updatePlayer(${i})">
-                    <input type="number" id="seed${i}" placeholder="シード" min="0" max="${count}" onchange="updatePlayer(${i})">
-                    <input type="text" id="affiliation${i}" placeholder="所属" onchange="updatePlayer(${i})">
-                `;
-                grid.appendChild(playerDiv);
+                const tournamentNameElement = document.getElementById('displayTournamentName');
+                const dateElement = document.getElementById('tournamentDate');
+                const venueElement = document.getElementById('venue');
+                
+                const tournamentName = tournamentNameElement ? tournamentNameElement.textContent : 'スカッシュ大会';
+                const date = dateElement ? dateElement.value : '';
+                const venue = venueElement ? venueElement.value : '';
+                
+                let shareText = `${tournamentName}\n`;
+                if (date) shareText += `開催日: ${date}\n`;
+                if (venue) shareText += `会場: ${venue}\n`;
+                shareText += '\nトーナメント表が作成されました！';
+
+                navigator.share({
+                    title: tournamentName,
+                    text: shareText,
+                    url: window.location.href
+                }).then(() => {
+                    showSuccess('共有が完了しました！');
+                }).catch((error) => {
+                    console.error('共有エラー:', error);
+                    showError('共有中にエラーが発生しました。');
+                });
+            } catch (error) {
+                console.error('shareOnMobileエラー:', error);
+                showError('共有機能でエラーが発生しました: ' + error.message);
             }
+        }
 
-            players = Array.from({length: count}, (_, i) => ({
-                id: i + 1,
-                name: '',
-                seed: 0,
-                affiliation: '',
-                position: i + 1
-            }));
+        function updatePlayerInputs() {
+            try {
+                const count = parseInt(document.getElementById('playerCount').value);
+                const grid = document.getElementById('playersGrid');
+                
+                if (!grid) {
+                    throw new Error('playersGrid要素が見つかりません');
+                }
+                
+                grid.innerHTML = '';
+
+                // players配列を初期化
+                players = [];
+                
+                for (let i = 1; i <= count; i++) {
+                    const playerDiv = document.createElement('div');
+                    playerDiv.className = 'player-input';
+                    playerDiv.innerHTML = `
+                        <span>${i}.</span>
+                        <input type="text" id="player${i}" placeholder="選手名" onchange="updatePlayer(${i})">
+                        <input type="number" id="seed${i}" placeholder="シード" min="0" max="${count}" onchange="updatePlayer(${i})">
+                        <input type="text" id="affiliation${i}" placeholder="所属" onchange="updatePlayer(${i})">
+                    `;
+                    grid.appendChild(playerDiv);
+                    
+                    // players配列に要素を追加
+                    players.push({
+                        id: i,
+                        name: '',
+                        seed: 0,
+                        affiliation: '',
+                        position: i
+                    });
+                }
+                
+                console.log('Players初期化完了:', players);
+            } catch (error) {
+                console.error('updatePlayerInputsエラー:', error);
+                showError('参加者入力フォームの初期化に失敗しました: ' + error.message);
+            }
         }
 
         function updatePlayer(index) {
-            const name = document.getElementById(`player${index}`).value;
-            const seed = parseInt(document.getElementById(`seed${index}`).value) || 0;
-            const affiliation = document.getElementById(`affiliation${index}`).value;
-            
-            if (players[index - 1]) {
-                players[index - 1].name = name;
-                players[index - 1].seed = seed;
-                players[index - 1].affiliation = affiliation;
+            try {
+                const nameElement = document.getElementById(`player${index}`);
+                const seedElement = document.getElementById(`seed${index}`);
+                const affiliationElement = document.getElementById(`affiliation${index}`);
+                
+                if (!nameElement || !seedElement || !affiliationElement) {
+                    console.warn(`Player ${index}の入力要素が見つかりません`);
+                    return;
+                }
+                
+                const name = nameElement.value || '';
+                const seed = parseInt(seedElement.value) || 0;
+                const affiliation = affiliationElement.value || '';
+                
+                // players配列の境界チェック
+                if (index > 0 && index <= players.length) {
+                    players[index - 1] = {
+                        id: index,
+                        name: name,
+                        seed: seed,
+                        affiliation: affiliation,
+                        position: index
+                    };
+                } else {
+                    console.warn(`Invalid player index: ${index}`);
+                }
+            } catch (error) {
+                console.error(`updatePlayer(${index})エラー:`, error);
             }
         }
 
         class TournamentGenerator {
             constructor(players, options = {}) {
-                this.players = players.filter(p => p.name.trim() !== '');
+                console.log('TournamentGenerator初期化:', players);
+                
+                if (!players || !Array.isArray(players)) {
+                    throw new Error('有効な参加者データが提供されていません');
+                }
+                
+                this.players = players.filter(p => p && p.name && p.name.trim() !== '');
+                console.log('フィルタ後の参加者:', this.players);
+                
+                if (this.players.length === 0) {
+                    throw new Error('有効な参加者が見つかりません');
+                }
+                
                 this.options = {
                     seedCorners: true,
                     strengthBalance: true,
@@ -616,11 +725,21 @@
                 };
                 this.drawSize = this.calculateDrawSize();
                 this.bracket = [];
+                
+                console.log('ドローサイズ:', this.drawSize);
             }
 
             calculateDrawSize() {
                 const playerCount = this.players.length;
-                return Math.pow(2, Math.ceil(Math.log2(playerCount)));
+                console.log('参加者数:', playerCount);
+                
+                if (playerCount < 2) {
+                    throw new Error('参加者は最低2名必要です');
+                }
+                
+                const drawSize = Math.pow(2, Math.ceil(Math.log2(playerCount)));
+                console.log('計算されたドローサイズ:', drawSize);
+                return drawSize;
             }
 
             generateSeededTournament() {
@@ -813,7 +932,15 @@
             try {
                 hideError();
                 
-                const filledPlayers = players.filter(p => p.name.trim() !== '');
+                // players配列の存在チェック
+                if (!players || !Array.isArray(players)) {
+                    throw new Error('参加者データが正しく初期化されていません。ページを再読み込みしてください。');
+                }
+                
+                console.log('現在のplayers配列:', players);
+                
+                const filledPlayers = players.filter(p => p && p.name && p.name.trim() !== '');
+                console.log('有効な参加者:', filledPlayers);
                 
                 if (filledPlayers.length < 2) {
                     throw new Error('最低2名の参加者が必要です。');
@@ -826,345 +953,764 @@
                     randomizeNonSeeded: document.getElementById('randomizeNonSeeded').checked
                 };
 
+                console.log('トーナメント設定:', options);
+
                 const generator = new TournamentGenerator(filledPlayers, options);
                 bracket = generator.generateBracket();
+                
+                console.log('生成されたブラケット:', bracket);
                 
                 displayTournament(bracket, generator.drawSize);
                 showCourtAssignment();
                 showSuccess('トーナメント表が正常に作成されました！');
                 
             } catch (error) {
+                console.error('generateTournamentエラー:', error);
                 showError(error.message);
             }
         }
 
         function displayTournament(bracket, drawSize) {
-            const display = document.getElementById('tournamentDisplay');
-            const bracketDiv = document.getElementById('tournamentBracket');
-            
-            document.getElementById('displayTournamentName').textContent = 
-                document.getElementById('tournamentName').value || 'スカッシュ大会';
-            
-            const date = document.getElementById('tournamentDate').value;
-            const venue = document.getElementById('venue').value;
-            document.getElementById('displayTournamentDetails').textContent = 
-                `${date ? '開催日: ' + date : ''} ${venue ? '会場: ' + venue : ''} (${drawSize}ドロー)`;
-
-            bracketDiv.innerHTML = '';
-
-            bracket.forEach((round, roundIndex) => {
-                const roundDiv = document.createElement('div');
-                roundDiv.className = 'round';
+            try {
+                console.log('displayTournament開始:', bracket);
                 
-                const roundTitle = document.createElement('h3');
-                const roundNames = ['1回戦', '2回戦', '準々決勝', '準決勝', '決勝'];
-                roundTitle.textContent = roundNames[roundIndex] || `${roundIndex + 1}回戦`;
-                roundDiv.appendChild(roundTitle);
+                const display = document.getElementById('tournamentDisplay');
+                const bracketDiv = document.getElementById('tournamentBracket');
+                
+                if (!display || !bracketDiv) {
+                    throw new Error('トーナメント表示要素が見つかりません');
+                }
+                
+                document.getElementById('displayTournamentName').textContent = 
+                    document.getElementById('tournamentName').value || 'スカッシュ大会';
+                
+                const date = document.getElementById('tournamentDate').value;
+                const venue = document.getElementById('venue').value;
+                document.getElementById('displayTournamentDetails').textContent = 
+                    `${date ? '開催日: ' + date : ''} ${venue ? '会場: ' + venue : ''} (${drawSize}ドロー)`;
 
-                round.forEach(match => {
-                    const matchDiv = document.createElement('div');
-                    matchDiv.className = `match ${match.completed ? 'completed' : ''}`;
-                    
-                    if (match.court) {
-                        const courtInfo = document.createElement('div');
-                        courtInfo.className = 'court-info';
-                        courtInfo.textContent = match.court;
-                        matchDiv.appendChild(courtInfo);
-                    }
+                bracketDiv.innerHTML = '';
 
-                    const matchHeader = document.createElement('div');
-                    matchHeader.className = 'match-header';
-                    matchHeader.innerHTML = `
-                        <span class="match-id">R${match.round}-M${match.matchNumber}</span>
-                        ${!match.completed && match.players[0] && match.players[1] && !match.players[0].isBye && !match.players[1].isBye ? 
-                            `<button class="btn btn-small" onclick="openScoreModal('${match.id}')">スコア入力</button>` : ''}
-                    `;
-                    matchDiv.appendChild(matchHeader);
+                if (!bracket || !Array.isArray(bracket)) {
+                    throw new Error('無効なブラケットデータです');
+                }
+
+                bracket.forEach((round, roundIndex) => {
+                    console.log(`ラウンド${roundIndex + 1}:`, round);
                     
-                    match.players.forEach((player, playerIndex) => {
-                        const playerRow = document.createElement('div');
-                        let className = 'player-row';
+                    const roundDiv = document.createElement('div');
+                    roundDiv.className = 'round';
+                    
+                    const roundTitle = document.createElement('h3');
+                    const roundNames = ['1回戦', '2回戦', '準々決勝', '準決勝', '決勝'];
+                    roundTitle.textContent = roundNames[roundIndex] || `${roundIndex + 1}回戦`;
+                    roundDiv.appendChild(roundTitle);
+
+                    round.forEach(match => {
+                        const matchDiv = document.createElement('div');
+                        matchDiv.className = `match ${match.completed ? 'completed' : ''}`;
                         
-                        if (match.completed && match.winner === playerIndex) {
-                            className += ' winner';
-                        } else if (match.completed && match.winner !== playerIndex && match.winner !== null) {
-                            className += ' loser';
+                        if (match.court) {
+                            const courtInfo = document.createElement('div');
+                            courtInfo.className = 'court-info';
+                            courtInfo.textContent = match.court;
+                            matchDiv.appendChild(courtInfo);
                         }
-                        
-                        playerRow.className = className;
-                        
-                        if (player) {
-                            if (player.isBye) {
-                                playerRow.classList.add('bye');
-                                playerRow.innerHTML = '<span>BYE</span>';
-                            } else {
-                                const playerInfo = document.createElement('div');
-                                playerInfo.className = 'player-info';
-                                
-                                const nameSpan = document.createElement('span');
-                                nameSpan.textContent = player.name;
-                                playerInfo.appendChild(nameSpan);
-                                
-                                if (player.displaySeed > 0) {
-                                    const seedSpan = document.createElement('span');
-                                    seedSpan.className = 'seed';
-                                    seedSpan.textContent = `[${player.displaySeed}]`;
-                                    playerInfo.appendChild(seedSpan);
-                                }
-                                
-                                if (player.affiliation) {
-                                    const affiliationSpan = document.createElement('span');
-                                    affiliationSpan.className = 'affiliation';
-                                    affiliationSpan.textContent = player.affiliation;
-                                    playerInfo.appendChild(affiliationSpan);
-                                }
-                                
-                                playerRow.appendChild(playerInfo);
-                                
-                                if (match.completed) {
-                                    const scoreSpan = document.createElement('span');
-                                    scoreSpan.className = 'score-display';
-                                    scoreSpan.textContent = match.scores[playerIndex];
-                                    playerRow.appendChild(scoreSpan);
-                                }
+
+                        const matchHeader = document.createElement('div');
+                        matchHeader.className = 'match-header';
+                        matchHeader.innerHTML = `
+                            <span class="match-id">R${match.round}-M${match.matchNumber}</span>
+                            ${!match.completed && match.players[0] && match.players[1] && !match.players[0].isBye && !match.players[1].isBye ? 
+                                `<button class="btn btn-small" onclick="openScoreModal('${match.id}')">スコア入力</button>` : ''}
+                        `;
+                        matchDiv.appendChild(matchHeader);
+                    
+                        match.players.forEach((player, playerIndex) => {
+                            const playerRow = document.createElement('div');
+                            let className = 'player-row';
+                            
+                            if (match.completed && match.winner === playerIndex) {
+                                className += ' winner';
+                            } else if (match.completed && match.winner !== playerIndex && match.winner !== null) {
+                                className += ' loser';
                             }
-                        } else {
-                            playerRow.innerHTML = '<span>－</span>';
-                        }
+                            
+                            playerRow.className = className;
+                            
+                            if (player) {
+                                if (player.isBye) {
+                                    playerRow.classList.add('bye');
+                                    playerRow.innerHTML = '<span>BYE</span>';
+                                } else {
+                                    const playerInfo = document.createElement('div');
+                                    playerInfo.className = 'player-info';
+                                    
+                                    const nameSpan = document.createElement('span');
+                                    nameSpan.textContent = player.name;
+                                    playerInfo.appendChild(nameSpan);
+                                    
+                                    if (player.displaySeed > 0) {
+                                        const seedSpan = document.createElement('span');
+                                        seedSpan.className = 'seed';
+                                        seedSpan.textContent = `[${player.displaySeed}]`;
+                                        playerInfo.appendChild(seedSpan);
+                                    }
+                                    
+                                    if (player.affiliation) {
+                                        const affiliationSpan = document.createElement('span');
+                                        affiliationSpan.className = 'affiliation';
+                                        affiliationSpan.textContent = player.affiliation;
+                                        playerInfo.appendChild(affiliationSpan);
+                                    }
+                                    
+                                    playerRow.appendChild(playerInfo);
+                                    
+                                    if (match.completed) {
+                                        const scoreSpan = document.createElement('span');
+                                        scoreSpan.className = 'score-display';
+                                        scoreSpan.textContent = match.scores[playerIndex];
+                                        playerRow.appendChild(scoreSpan);
+                                    }
+                                }
+                            } else {
+                                playerRow.innerHTML = '<span>－</span>';
+                            }
+                            
+                            matchDiv.appendChild(playerRow);
+                        });
                         
-                        matchDiv.appendChild(playerRow);
+                        roundDiv.appendChild(matchDiv);
                     });
-                    
-                    roundDiv.appendChild(matchDiv);
+
+                    bracketDiv.appendChild(roundDiv);
+
+                    // コネクターを追加（最後のラウンド以外）
+                    if (roundIndex < bracket.length - 1) {
+                        const connector = document.createElement('div');
+                        connector.className = 'connector';
+                        bracketDiv.appendChild(connector);
+                    }
                 });
 
-                bracketDiv.appendChild(roundDiv);
-
-                // コネクターを追加（最後のラウンド以外）
-                if (roundIndex < bracket.length - 1) {
-                    const connector = document.createElement('div');
-                    connector.className = 'connector';
-                    bracketDiv.appendChild(connector);
-                }
-            });
-
-            display.style.display = 'block';
+                display.style.display = 'block';
+            } catch (error) {
+                console.error('displayTournamentエラー:', error);
+                showError('トーナメント表示中にエラーが発生しました: ' + error.message);
+            }
         }
 
         function showCourtAssignment() {
-            const courtAssignment = document.getElementById('courtAssignment');
-            const courtGrid = document.getElementById('courtGrid');
-            courtGrid.innerHTML = '';
+            try {
+                const courtAssignment = document.getElementById('courtAssignment');
+                const courtGrid = document.getElementById('courtGrid');
+                courtGrid.innerHTML = '';
 
-            // 1回戦の試合のみコート割り当て
-            const firstRound = bracket[0];
-            
-            firstRound.forEach(match => {
-                if (match.players[0] && match.players[1] && !match.players[0].isBye && !match.players[1].isBye) {
-                    const courtItem = document.createElement('div');
-                    courtItem.className = 'court-item';
-                    
-                    const matchInfo = `R${match.round}-M${match.matchNumber}: ${match.players[0].name} vs ${match.players[1].name}`;
-                    
-                    courtItem.innerHTML = `
-                        <strong>${matchInfo}</strong>
-                        <select id="court_${match.id}">
-                            <option value="">コートを選択</option>
-                            ${courts.map(court => `<option value="${court}">${court}</option>`).join('')}
-                        </select>
-                    `;
-                    
-                    courtGrid.appendChild(courtItem);
-                }
-            });
+                // 1回戦の試合のみコート割り当て
+                const firstRound = bracket[0];
+                
+                firstRound.forEach(match => {
+                    if (match.players[0] && match.players[1] && !match.players[0].isBye && !match.players[1].isBye) {
+                        const courtItem = document.createElement('div');
+                        courtItem.className = 'court-item';
+                        
+                        const matchInfo = `R${match.round}-M${match.matchNumber}: ${match.players[0].name} vs ${match.players[1].name}`;
+                        
+                        courtItem.innerHTML = `
+                            <strong>${matchInfo}</strong>
+                            <select id="court_${match.id}">
+                                <option value="">コートを選択</option>
+                                ${courts.map(court => `<option value="${court}">${court}</option>`).join('')}
+                            </select>
+                        `;
+                        
+                        courtGrid.appendChild(courtItem);
+                    }
+                });
 
-            courtAssignment.style.display = 'block';
+                courtAssignment.style.display = 'block';
+            } catch (error) {
+                console.error('showCourtAssignmentエラー:', error);
+                showError('コート割り当て表示中にエラーが発生しました: ' + error.message);
+            }
         }
 
         function assignCourts() {
-            const firstRound = bracket[0];
-            
-            firstRound.forEach(match => {
-                const courtSelect = document.getElementById(`court_${match.id}`);
-                if (courtSelect && courtSelect.value) {
-                    match.court = courtSelect.value;
+            try {
+                const firstRound = bracket[0];
+                
+                if (!firstRound) {
+                    showError('1回戦のデータが見つかりません');
+                    return;
                 }
-            });
+                
+                firstRound.forEach(match => {
+                    const courtSelect = document.getElementById(`court_${match.id}`);
+                    if (courtSelect && courtSelect.value) {
+                        match.court = courtSelect.value;
+                    }
+                });
 
-            displayTournament(bracket, Math.pow(2, Math.ceil(Math.log2(players.filter(p => p.name.trim() !== '').length))));
-            showSuccess('コート割り当てが完了しました！');
+                displayTournament(bracket, Math.pow(2, Math.ceil(Math.log2(players.filter(p => p && p.name && p.name.trim() !== '').length))));
+                showSuccess('コート割り当てが完了しました！');
+                
+            } catch (error) {
+                console.error('assignCourtsエラー:', error);
+                showError('コート割り当て中にエラーが発生しました: ' + error.message);
+            }
         }
 
         function openScoreModal(matchId) {
-            const match = findMatchById(matchId);
-            if (!match || match.completed) return;
+            try {
+                const match = findMatchById(matchId);
+                if (!match || match.completed) return;
 
-            currentScoreMatch = match;
-            const modal = document.getElementById('scoreModal');
-            const form = document.getElementById('scoreForm');
-            
-            form.innerHTML = `
-                <div style="margin-bottom: 15px;">
-                    <strong>${match.players[0].name} vs ${match.players[1].name}</strong>
-                    ${match.court ? `<br><small>コート: ${match.court}</small>` : ''}
-                </div>
-                <div style="display: flex; gap: 20px; align-items: center; justify-content: center;">
-                    <div style="text-align: center;">
-                        <div><strong>${match.players[0].name}</strong></div>
-                        <input type="number" id="score0" min="0" max="20" value="${match.scores[0]}" style="width: 60px; text-align: center; font-size: 18px; padding: 8px; margin-top: 8px;">
+                currentScoreMatch = match;
+                const modal = document.getElementById('scoreModal');
+                const form = document.getElementById('scoreForm');
+                
+                form.innerHTML = `
+                    <div style="margin-bottom: 15px;">
+                        <strong>${match.players[0].name} vs ${match.players[1].name}</strong>
+                        ${match.court ? `<br><small>コート: ${match.court}</small>` : ''}
                     </div>
-                    <div style="font-size: 24px; font-weight: bold;">-</div>
-                    <div style="text-align: center;">
-                        <div><strong>${match.players[1].name}</strong></div>
-                        <input type="number" id="score1" min="0" max="20" value="${match.scores[1]}" style="width: 60px; text-align: center; font-size: 18px; padding: 8px; margin-top: 8px;">
+                    <div style="display: flex; gap: 20px; align-items: center; justify-content: center;">
+                        <div style="text-align: center;">
+                            <div><strong>${match.players[0].name}</strong></div>
+                            <input type="number" id="score0" min="0" max="20" value="${match.scores[0]}" style="width: 60px; text-align: center; font-size: 18px; padding: 8px; margin-top: 8px;">
+                        </div>
+                        <div style="font-size: 24px; font-weight: bold;">-</div>
+                        <div style="text-align: center;">
+                            <div><strong>${match.players[1].name}</strong></div>
+                            <input type="number" id="score1" min="0" max="20" value="${match.scores[1]}" style="width: 60px; text-align: center; font-size: 18px; padding: 8px; margin-top: 8px;">
+                        </div>
                     </div>
-                </div>
-                <div style="text-align: center; margin-top: 15px;">
-                    <small>勝者のスコアを高く入力してください</small>
-                </div>
-            `;
-            
-            modal.style.display = 'block';
+                    <div style="text-align: center; margin-top: 15px;">
+                        <small>勝者のスコアを高く入力してください</small>
+                    </div>
+                `;
+                
+                modal.style.display = 'block';
+            } catch (error) {
+                console.error('openScoreModalエラー:', error);
+                showError('スコア入力モーダルでエラーが発生しました: ' + error.message);
+            }
         }
 
         function closeScoreModal() {
-            document.getElementById('scoreModal').style.display = 'none';
-            currentScoreMatch = null;
+            try {
+                document.getElementById('scoreModal').style.display = 'none';
+                currentScoreMatch = null;
+            } catch (error) {
+                console.error('closeScoreModalエラー:', error);
+            }
         }
 
         function submitScore() {
-            if (!currentScoreMatch) return;
+            try {
+                if (!currentScoreMatch) return;
 
-            const score0 = parseInt(document.getElementById('score0').value) || 0;
-            const score1 = parseInt(document.getElementById('score1').value) || 0;
+                const score0 = parseInt(document.getElementById('score0').value) || 0;
+                const score1 = parseInt(document.getElementById('score1').value) || 0;
 
-            if (score0 === score1) {
-                alert('引き分けは認められません。勝者を決定してください。');
-                return;
+                if (score0 === score1) {
+                    alert('引き分けは認められません。勝者を決定してください。');
+                    return;
+                }
+
+                currentScoreMatch.scores = [score0, score1];
+                currentScoreMatch.winner = score0 > score1 ? 0 : 1;
+                currentScoreMatch.completed = true;
+
+                // 勝者を次のラウンドに進める
+                advanceWinner(currentScoreMatch);
+                
+                // 表示を更新
+                displayTournament(bracket, Math.pow(2, Math.ceil(Math.log2(players.filter(p => p.name.trim() !== '').length))));
+                
+                closeScoreModal();
+                showSuccess(`試合結果が保存されました！勝者: ${currentScoreMatch.players[currentScoreMatch.winner].name}`);
+            } catch (error) {
+                console.error('submitScoreエラー:', error);
+                showError('スコア保存中にエラーが発生しました: ' + error.message);
             }
-
-            currentScoreMatch.scores = [score0, score1];
-            currentScoreMatch.winner = score0 > score1 ? 0 : 1;
-            currentScoreMatch.completed = true;
-
-            // 勝者を次のラウンドに進める
-            advanceWinner(currentScoreMatch);
-            
-            // 表示を更新
-            displayTournament(bracket, Math.pow(2, Math.ceil(Math.log2(players.filter(p => p.name.trim() !== '').length))));
-            
-            closeScoreModal();
-            showSuccess(`試合結果が保存されました！勝者: ${currentScoreMatch.players[currentScoreMatch.winner].name}`);
         }
 
         function advanceWinner(completedMatch) {
-            const winner = completedMatch.players[completedMatch.winner];
-            
-            // 次のラウンドを探す
-            for (let roundIndex = 1; roundIndex < bracket.length; roundIndex++) {
-                const round = bracket[roundIndex];
+            try {
+                const winner = completedMatch.players[completedMatch.winner];
                 
-                for (let match of round) {
-                    if (match.prevMatches && match.prevMatches.includes(completedMatch)) {
-                        // この試合に勝者を進める
-                        if (match.players[0] === null) {
-                            match.players[0] = winner;
-                        } else if (match.players[1] === null) {
-                            match.players[1] = winner;
+                // 次のラウンドを探す
+                for (let roundIndex = 1; roundIndex < bracket.length; roundIndex++) {
+                    const round = bracket[roundIndex];
+                    
+                    for (let match of round) {
+                        if (match.prevMatches && match.prevMatches.includes(completedMatch)) {
+                            // この試合に勝者を進める
+                            if (match.players[0] === null) {
+                                match.players[0] = winner;
+                            } else if (match.players[1] === null) {
+                                match.players[1] = winner;
+                            }
+                            return;
                         }
-                        return;
                     }
                 }
+            } catch (error) {
+                console.error('advanceWinnerエラー:', error);
+                showError('勝者進出処理でエラーが発生しました: ' + error.message);
             }
         }
 
         function findMatchById(matchId) {
-            for (let round of bracket) {
-                for (let match of round) {
-                    if (match.id === matchId) {
-                        return match;
+            try {
+                for (let round of bracket) {
+                    for (let match of round) {
+                        if (match.id === matchId) {
+                            return match;
+                        }
                     }
                 }
+                return null;
+            } catch (error) {
+                console.error('findMatchByIdエラー:', error);
+                return null;
             }
-            return null;
         }
 
         function resetTournament() {
-            if (confirm('トーナメントをリセットしますか？すべての結果が削除されます。')) {
-                bracket = [];
-                document.getElementById('tournamentDisplay').style.display = 'none';
-                document.getElementById('courtAssignment').style.display = 'none';
-                hideError();
-                hideSuccess();
-                updatePlayerInputs();
-                showSuccess('トーナメントがリセットされました。');
+            try {
+                if (confirm('トーナメントをリセットしますか？すべての結果が削除されます。')) {
+                    bracket = [];
+                    const tournamentDisplay = document.getElementById('tournamentDisplay');
+                    const courtAssignment = document.getElementById('courtAssignment');
+                    
+                    if (tournamentDisplay) tournamentDisplay.style.display = 'none';
+                    if (courtAssignment) courtAssignment.style.display = 'none';
+                    
+                    hideError();
+                    hideSuccess();
+                    updatePlayerInputs();
+                    showSuccess('トーナメントがリセットされました。');
+                }
+            } catch (error) {
+                console.error('resetTournamentエラー:', error);
+                showError('リセット中にエラーが発生しました: ' + error.message);
             }
         }
 
         function exportTournament() {
-            // 印刷用のスタイルを適用してPDF出力
-            const printWindow = window.open('', '', 'height=600,width=800');
-            const tournamentHtml = document.getElementById('tournamentDisplay').innerHTML;
-            
-            printWindow.document.write(`
-                <html>
-                <head>
-                    <title>スカッシュトーナメント表</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; }
-                        .tournament-bracket { display: flex; gap: 30px; }
-                        .round { display: flex; flex-direction: column; gap: 15px; }
-                        .match { border: 2px solid #2a5298; border-radius: 8px; padding: 10px; margin: 5px 0; min-width: 180px; }
-                        .player-row { border: 1px solid #ddd; padding: 5px; margin: 2px 0; border-radius: 4px; }
-                        .winner { background: #d4edda; font-weight: bold; }
-                        .seed { background: #2a5298; color: white; padding: 2px 6px; border-radius: 8px; font-size: 11px; }
-                        .affiliation { background: #6c757d; color: white; padding: 2px 4px; border-radius: 6px; font-size: 10px; }
-                        .court-info { background: #2a5298; color: white; padding: 2px 6px; border-radius: 6px; font-size: 11px; float: right; }
-                        h2, h3 { color: #2a5298; }
-                        @media print { body { margin: 10px; font-size: 12px; } }
-                    </style>
-                </head>
-                <body>${tournamentHtml}</body>
-                </html>
-            `);
-            
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 250);
+            try {
+                // モバイルデバイスの検出
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                if (isMobile) {
+                    // モバイル用：HTMLファイルとしてダウンロード
+                    exportAsHTML();
+                } else {
+                    // デスクトップ用：印刷ダイアログを開く
+                    exportAsPrint();
+                }
+            } catch (error) {
+                console.error('エクスポートエラー:', error);
+                showError('エクスポート中にエラーが発生しました: ' + error.message);
+            }
+        }
+
+        function exportAsHTML() {
+            try {
+                const tournamentHtml = document.getElementById('tournamentDisplay').innerHTML;
+                const tournamentName = document.getElementById('displayTournamentName').textContent || 'スカッシュ大会';
+                
+                const fullHtml = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${tournamentName}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: white;
+            color: #333;
+        }
+        .tournament-info {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .tournament-bracket {
+            display: flex;
+            gap: 30px;
+            overflow-x: auto;
+            padding: 20px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .round {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            min-width: 200px;
+        }
+        .round h3 {
+            color: #2a5298;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 1.1em;
+            padding: 8px 16px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            margin: 0 0 15px 0;
+        }
+        .match {
+            border: 2px solid #2a5298;
+            border-radius: 10px;
+            padding: 12px;
+            margin: 8px 0;
+            min-width: 180px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .match.completed {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+        .court-info {
+            position: absolute;
+            top: -8px;
+            right: 8px;
+            background: #2a5298;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .match-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #666;
+            font-weight: bold;
+        }
+        .player-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 3px 0;
+            background: #f8f9fa;
+        }
+        .player-row.winner {
+            background: #d4edda;
+            border-color: #28a745;
+            font-weight: bold;
+        }
+        .player-row.loser {
+            background: #f8d7da;
+            border-color: #dc3545;
+            opacity: 0.7;
+        }
+        .player-row.bye {
+            background: #e9ecef;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+        }
+        .seed {
+            background: #2a5298;
+            color: white;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .affiliation {
+            background: #6c757d;
+            color: white;
+            padding: 1px 5px;
+            border-radius: 6px;
+            font-size: 9px;
+        }
+        .score-display {
+            font-weight: bold;
+            color: #2a5298;
+            margin-left: 6px;
+            font-size: 14px;
+        }
+        .connector {
+            display: none;
+        }
+        h2 {
+            color: #2a5298;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                margin: 10px;
+            }
+            .tournament-bracket {
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+            }
+            .round {
+                width: 100%;
+                max-width: 300px;
+            }
+            .match {
+                min-width: auto;
+                width: 100%;
+            }
+        }
+        
+        @media print {
+            body {
+                margin: 10px;
+                font-size: 12px;
+            }
+            .tournament-bracket {
+                flex-wrap: nowrap;
+                gap: 20px;
+            }
+            .round {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    ${tournamentHtml}
+    <div style="text-align: center; margin-top: 30px; padding: 20px; border-top: 1px solid #ddd; color: #666;">
+        <p>スカッシュトーナメント表作成ツールで生成</p>
+        <p>生成日時: ${new Date().toLocaleString('ja-JP')}</p>
+    </div>
+</body>
+</html>`;
+
+                // HTMLファイルとしてダウンロード
+                const blob = new Blob([fullHtml], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${tournamentName.replace(/[^a-zA-Z0-9]/g, '_')}_tournament.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showSuccess('トーナメント表をHTMLファイルとしてダウンロードしました！');
+            } catch (error) {
+                console.error('exportAsHTMLエラー:', error);
+                showError('HTMLエクスポート中にエラーが発生しました: ' + error.message);
+            }
+        }
+
+        function exportAsPrint() {
+            try {
+                // デスクトップ用の印刷ダイアログ
+                const printWindow = window.open('', '', 'height=600,width=800');
+                const tournamentHtml = document.getElementById('tournamentDisplay').innerHTML;
+                
+                printWindow.document.write(`
+                    <html>
+                    <head>
+                        <title>スカッシュトーナメント表</title>
+                        <style>
+                            body { 
+                                font-family: Arial, sans-serif; 
+                                margin: 20px; 
+                                color: #333;
+                            }
+                            .tournament-bracket { 
+                                display: flex; 
+                                gap: 30px; 
+                                justify-content: center;
+                                flex-wrap: wrap;
+                            }
+                            .round { 
+                                display: flex; 
+                                flex-direction: column; 
+                                gap: 15px; 
+                                align-items: center;
+                            }
+                            .match { 
+                                border: 2px solid #2a5298; 
+                                border-radius: 8px; 
+                                padding: 10px; 
+                                margin: 5px 0; 
+                                min-width: 180px; 
+                                position: relative;
+                            }
+                            .match.completed { 
+                                border-color: #28a745; 
+                                background: #f8fff9;
+                            }
+                            .player-row { 
+                                border: 1px solid #ddd; 
+                                padding: 5px; 
+                                margin: 2px 0; 
+                                border-radius: 4px; 
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                            }
+                            .winner { 
+                                background: #d4edda; 
+                                font-weight: bold; 
+                            }
+                            .seed { 
+                                background: #2a5298; 
+                                color: white; 
+                                padding: 2px 6px; 
+                                border-radius: 8px; 
+                                font-size: 11px; 
+                            }
+                            .affiliation { 
+                                background: #6c757d; 
+                                color: white; 
+                                padding: 2px 4px; 
+                                border-radius: 6px; 
+                                font-size: 10px; 
+                            }
+                            .court-info { 
+                                background: #2a5298; 
+                                color: white; 
+                                padding: 2px 6px; 
+                                border-radius: 6px; 
+                                font-size: 11px; 
+                                position: absolute;
+                                top: -6px;
+                                right: 6px;
+                            }
+                            h2, h3 { 
+                                color: #2a5298; 
+                            }
+                            .connector {
+                                display: none;
+                            }
+                            @media print { 
+                                body { 
+                                    margin: 10px; 
+                                    font-size: 12px; 
+                                }
+                                .tournament-bracket {
+                                    flex-wrap: nowrap;
+                                }
+                            }
+                        </style>
+                    </head>
+                    <body>${tournamentHtml}</body>
+                    </html>
+                `);
+                
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => {
+                    printWindow.print();
+                    printWindow.close();
+                }, 500);
+            } catch (error) {
+                console.error('exportAsPrintエラー:', error);
+                showError('印刷エクスポート中にエラーが発生しました: ' + error.message);
+            }
         }
 
         function showError(message) {
-            const errorDiv = document.getElementById('errorMessage');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            setTimeout(hideError, 5000);
+            try {
+                const errorDiv = document.getElementById('errorMessage');
+                if (errorDiv) {
+                    errorDiv.textContent = message;
+                    errorDiv.style.display = 'block';
+                    setTimeout(hideError, 5000);
+                } else {
+                    console.error('Error message element not found:', message);
+                    alert('エラー: ' + message);
+                }
+            } catch (error) {
+                console.error('showError function error:', error);
+                alert('エラー: ' + message);
+            }
         }
 
         function hideError() {
-            document.getElementById('errorMessage').style.display = 'none';
+            try {
+                const errorDiv = document.getElementById('errorMessage');
+                if (errorDiv) {
+                    errorDiv.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('hideError function error:', error);
+            }
         }
 
         function showSuccess(message) {
-            const successDiv = document.getElementById('successMessage');
-            successDiv.textContent = message;
-            successDiv.style.display = 'block';
-            setTimeout(hideSuccess, 3000);
+            try {
+                const successDiv = document.getElementById('successMessage');
+                if (successDiv) {
+                    successDiv.textContent = message;
+                    successDiv.style.display = 'block';
+                    setTimeout(hideSuccess, 3000);
+                } else {
+                    console.log('Success:', message);
+                }
+            } catch (error) {
+                console.error('showSuccess function error:', error);
+            }
         }
 
         function hideSuccess() {
-            document.getElementById('successMessage').style.display = 'none';
+            try {
+                const successDiv = document.getElementById('successMessage');
+                if (successDiv) {
+                    successDiv.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('hideSuccess function error:', error);
+            }
         }
 
         // モーダルの外側をクリックしたら閉じる
         window.onclick = function(event) {
-            const modal = document.getElementById('scoreModal');
-            if (event.target === modal) {
-                closeScoreModal();
+            try {
+                const modal = document.getElementById('scoreModal');
+                if (event.target === modal) {
+                    closeScoreModal();
+                }
+            } catch (error) {
+                console.error('Window onclick error:', error);
             }
         }
+
+        // グローバル関数として定義（HTML内のonchange属性から呼び出されるため）
+        window.updatePlayer = updatePlayer;
+        window.updatePlayerInputs = updatePlayerInputs;
+        window.generateTournament = generateTournament;
+        window.exportTournament = exportTournament;
+        window.resetTournament = resetTournament;
+        window.assignCourts = assignCourts;
+        window.openScoreModal = openScoreModal;
+        window.closeScoreModal = closeScoreModal;
+        window.submitScore = submitScore;
+        window.shareOnMobile = shareOnMobile;
+
     </script>
 </body>
 </html>
+                        
