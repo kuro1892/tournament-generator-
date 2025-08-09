@@ -77,6 +77,42 @@
             outline: none;
         }
 
+        .excel-upload-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin-bottom: 30px;
+            border: 2px dashed #2a5298;
+        }
+
+        .upload-area {
+            text-align: center;
+            padding: 30px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            transition: border-color 0.3s;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #2a5298;
+            background: rgba(42, 82, 152, 0.05);
+        }
+
+        .upload-area.dragover {
+            border-color: #2a5298;
+            background: rgba(42, 82, 152, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #2a5298;
+            margin-bottom: 15px;
+        }
+
         .players-container {
             background: rgba(255, 255, 255, 0.95);
             padding: 25px;
@@ -91,11 +127,16 @@
             grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            border-radius: 8px;
         }
 
         .player-input {
             display: grid;
-            grid-template-columns: 30px 2fr 1fr 1fr;
+            grid-template-columns: 40px 2fr 1fr 1fr;
             gap: 10px;
             align-items: center;
             padding: 10px;
@@ -145,9 +186,37 @@
             background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
         }
 
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
         .btn-small {
             padding: 6px 12px;
             font-size: 12px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-info {
+            background: #e7f3ff;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .player-count-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2a5298;
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(42, 82, 152, 0.1);
+            border-radius: 8px;
         }
 
         .tournament-display {
@@ -432,6 +501,36 @@
             to { opacity: 1; }
         }
 
+        .tab-container {
+            display: flex;
+            border-bottom: 2px solid #2a5298;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .tab.active {
+            background: #2a5298;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         @media (max-width: 768px) {
             .input-group {
                 flex-direction: column;
@@ -449,7 +548,11 @@
             }
             
             .player-input {
-                grid-template-columns: 25px 1fr 80px 80px;
+                grid-template-columns: 30px 1fr 80px 80px;
+            }
+
+            .tab-container {
+                flex-direction: column;
             }
         }
     </style>
@@ -458,7 +561,7 @@
     <div class="container">
         <div class="header">
             <h1>🏸 スカッシュトーナメント表作成ツール</h1>
-            <p>プロフェッショナルなトーナメント表を簡単作成</p>
+            <p>プロフェッショナルなトーナメント表を簡単作成（1-99人対応）</p>
         </div>
 
         <div class="control-panel">
@@ -476,12 +579,15 @@
                     <input type="text" id="venue" placeholder="会場名を入力">
                 </div>
                 <div class="input-field">
-                    <label>参加者数</label>
+                    <label>参加者上限</label>
                     <select id="playerCount" onchange="updatePlayerInputs()">
                         <option value="4">4人</option>
                         <option value="8" selected>8人</option>
                         <option value="16">16人</option>
                         <option value="32">32人</option>
+                        <option value="48">48人</option>
+                        <option value="64">64人</option>
+                        <option value="99">99人</option>
                     </select>
                 </div>
             </div>
@@ -526,12 +632,98 @@
             </div>
         </div>
 
-        <div class="players-container">
-            <h3>参加者情報入力</h3>
-            <div class="input-group" style="margin-bottom: 15px;">
-                <small>順番: 選手名 | シード番号 | 所属</small>
+        <!-- Excelアップロード機能 -->
+        <div class="excel-upload-section">
+            <h3>📊 Excelファイル読み込み</h3>
+            <div class="tab-container">
+                <button class="tab active" onclick="switchTab('upload')">ファイル読み込み</button>
+                <button class="tab" onclick="switchTab('template')">テンプレート</button>
             </div>
-            <div id="playersGrid" class="players-grid"></div>
+            
+            <div id="upload-tab" class="tab-content active">
+                <div class="upload-area" onclick="document.getElementById('excelFile').click()" 
+                     ondrop="dropHandler(event);" ondragover="dragOverHandler(event);" ondragleave="dragLeaveHandler(event);">
+                    <div class="upload-icon">📁</div>
+                    <h3>Excelファイルをドラッグ&ドロップまたはクリックして選択</h3>
+                    <p>対応形式: .xlsx, .xls</p>
+                    <p>列の順序: 選手名, シード番号, 所属</p>
+                </div>
+                <input type="file" id="excelFile" class="file-input" accept=".xlsx,.xls" onchange="handleFileSelect(event)">
+                <div id="fileInfo" class="file-info"></div>
+                <button class="btn btn-success" onclick="loadFromExcel()" id="loadBtn" style="display: none; margin-top: 15px;">
+                    Excelから読み込み
+                </button>
+            </div>
+            
+            <div id="template-tab" class="tab-content">
+                <h4>📋 Excelテンプレート</h4>
+                <p>以下の列構成でExcelファイルを作成してください：</p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #2a5298; color: white;">
+                                <th style="padding: 8px; border: 1px solid #ddd;">A列: 選手名</th>
+                                <th style="padding: 8px; border: 1px solid #ddd;">B列: シード番号</th>
+                                <th style="padding: 8px; border: 1px solid #ddd;">C列: 所属</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;">田中太郎</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">1</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">A大学</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;">佐藤花子</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">2</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">B高校</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;">山田次郎</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">（空白）</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">C会社</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <ul style="margin: 15px 0; padding-left: 20px;">
+                    <li>1行目にヘッダー（選手名、シード番号、所属）があってもなくても大丈夫です</li>
+                    <li>シード番号は数字で入力（ノーシードは0または空白）</li>
+                    <li>所属は空白でも構いません</li>
+                    <li>最大99名まで対応</li>
+                    <li><strong>重要：</strong>B列（シード番号）は数値として入力してください</li>
+                </ul>
+                <button class="btn btn-success" onclick="downloadTemplate()">
+                    📥 テンプレートをダウンロード
+                </button>
+            </div>
+        </div>
+
+        <!-- 参加者入力セクション -->
+        <div class="players-container">
+            <div class="tab-container">
+                <button class="tab active" onclick="switchInputTab('manual')">手動入力</button>
+                <button class="tab" onclick="switchInputTab('bulk')">一括入力</button>
+            </div>
+            
+            <div id="manual-input" class="tab-content active">
+                <h3>参加者情報入力</h3>
+                <div class="player-count-display" id="playerCountDisplay">
+                    現在の参加者数: 0 / 8
+                </div>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <small>順番: 選手名 | シード番号 | 所属</small>
+                </div>
+                <div id="playersGrid" class="players-grid"></div>
+            </div>
+            
+            <div id="bulk-input" class="tab-content">
+                <h3>一括入力</h3>
+                <p>1行につき1名、「選手名,シード番号,所属」の形式で入力してください（カンマ区切り）</p>
+                <textarea id="bulkInput" placeholder="例：&#10;田中太郎,1,A大学&#10;佐藤花子,2,B高校&#10;山田次郎,0,C会社" 
+                          style="width: 100%; height: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin: 10px 0;"></textarea>
+                <button class="btn" onclick="loadFromBulkInput()">一括入力から読み込み</button>
+            </div>
         </div>
 
         <div id="courtAssignment" class="court-assignment" style="display: none;">
@@ -563,12 +755,16 @@
         </div>
     </div>
 
+    <!-- SheetJS CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <script>
         let players = [];
         let tournament = null;
         let bracket = [];
         let courts = ['コート1', 'コート2', 'コート3', 'コート4'];
         let currentScoreMatch = null;
+        let currentExcelFile = null;
 
         // 初期化
         document.addEventListener('DOMContentLoaded', function() {
@@ -590,6 +786,301 @@
                 showError('初期化中にエラーが発生しました: ' + error.message);
             }
         });
+
+        // タブ切り替え機能
+        function switchTab(tabName) {
+            // アップロードタブの切り替え
+            document.querySelectorAll('.excel-upload-section .tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.excel-upload-section .tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        function switchInputTab(tabName) {
+            // 入力タブの切り替え
+            document.querySelectorAll('.players-container .tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.players-container .tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-input').classList.add('active');
+        }
+
+        // ドラッグ&ドロップ機能
+        function dragOverHandler(ev) {
+            ev.preventDefault();
+            ev.currentTarget.classList.add('dragover');
+        }
+
+        function dragLeaveHandler(ev) {
+            ev.currentTarget.classList.remove('dragover');
+        }
+
+        function dropHandler(ev) {
+            ev.preventDefault();
+            ev.currentTarget.classList.remove('dragover');
+            
+            const files = ev.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            if (!file.name.match(/\.(xlsx|xls)$/i)) {
+                showError('Excelファイル(.xlsx, .xls)を選択してください。');
+                return;
+            }
+
+            currentExcelFile = file;
+            const fileInfo = document.getElementById('fileInfo');
+            fileInfo.innerHTML = `
+                <strong>選択されたファイル:</strong> ${file.name}<br>
+                <strong>サイズ:</strong> ${(file.size / 1024).toFixed(2)} KB<br>
+                <strong>最終更新:</strong> ${new Date(file.lastModified).toLocaleString('ja-JP')}
+            `;
+            fileInfo.style.display = 'block';
+            document.getElementById('loadBtn').style.display = 'inline-block';
+        }
+
+        // Excelファイル読み込み
+        function loadFromExcel() {
+            if (!currentExcelFile) {
+                showError('ファイルが選択されていません。');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    console.log('読み込んだExcelデータ:', jsonData);
+
+                    if (jsonData.length === 0) {
+                        showError('Excelファイルにデータが見つかりません。');
+                        return;
+                    }
+
+                    // データ開始行を検出（ヘッダー行をスキップ）
+                    let startRow = 0;
+                    const firstRow = jsonData[0];
+                    if (firstRow && firstRow.length > 0) {
+                        const firstCell = String(firstRow[0] || '').toLowerCase();
+                        if (firstCell.includes('選手') || firstCell.includes('name') || firstCell.includes('player')) {
+                            startRow = 1; // ヘッダー行をスキップ
+                        }
+                    }
+
+                    const excelPlayers = [];
+                    for (let i = startRow; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (row && row.length > 0 && row[0]) {
+                            const name = String(row[0] || '').trim();
+                            // シード番号の処理を改善（文字列から数値への変換を強化）
+                            let seed = 0;
+                            if (row[1] !== undefined && row[1] !== null && row[1] !== '') {
+                                const seedValue = String(row[1]).trim();
+                                const parsedSeed = parseInt(seedValue);
+                                if (!isNaN(parsedSeed) && parsedSeed >= 0) {
+                                    seed = parsedSeed;
+                                }
+                            }
+                            
+                            // 所属の処理を改善
+                            const affiliation = row[2] !== undefined && row[2] !== null ? String(row[2]).trim() : '';
+                            
+                            if (name) {
+                                const playerData = {
+                                    id: excelPlayers.length + 1,
+                                    name: name,
+                                    seed: seed,
+                                    affiliation: affiliation,
+                                    position: excelPlayers.length + 1
+                                };
+                                console.log(`選手${excelPlayers.length + 1}:`, playerData);
+                                excelPlayers.push(playerData);
+                            }
+                        }
+                    }
+
+                    if (excelPlayers.length === 0) {
+                        showError('有効な選手データが見つかりません。');
+                        return;
+                    }
+
+                    if (excelPlayers.length > 99) {
+                        showError('選手数が上限（99人）を超えています。');
+                        return;
+                    }
+
+                    // 参加者上限を自動調整
+                    const requiredCapacity = Math.max(
+                        parseInt(document.getElementById('playerCount').value),
+                        excelPlayers.length
+                    );
+                    
+                    const capacityOptions = [4, 8, 16, 32, 48, 64, 99];
+                    const newCapacity = capacityOptions.find(cap => cap >= requiredCapacity) || 99;
+                    
+                    document.getElementById('playerCount').value = newCapacity;
+
+                    // playersを更新
+                    players = [...excelPlayers];
+                    
+                    // 不足分は空のプレイヤーで埋める
+                    while (players.length < newCapacity) {
+                        players.push({
+                            id: players.length + 1,
+                            name: '',
+                            seed: 0,
+                            affiliation: '',
+                            position: players.length + 1
+                        });
+                    }
+
+                    updatePlayerInputs();
+                    updatePlayerCountDisplay();
+                    showSuccess(`${excelPlayers.length}名の選手データを読み込みました！`);
+
+                } catch (error) {
+                    console.error('Excel読み込みエラー:', error);
+                    showError('Excelファイルの読み込み中にエラーが発生しました: ' + error.message);
+                }
+            };
+            
+            reader.readAsArrayBuffer(currentExcelFile);
+        }
+
+        // 一括入力機能
+        function loadFromBulkInput() {
+            try {
+                const bulkText = document.getElementById('bulkInput').value.trim();
+                if (!bulkText) {
+                    showError('一括入力テキストが空です。');
+                    return;
+                }
+
+                const lines = bulkText.split('\n').filter(line => line.trim());
+                const bulkPlayers = [];
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const parts = line.split(',').map(part => part.trim());
+                    const name = parts[0] || '';
+                    const seed = parseInt(parts[1]) || 0;
+                    const affiliation = parts[2] || '';
+
+                    if (name) {
+                        bulkPlayers.push({
+                            id: bulkPlayers.length + 1,
+                            name: name,
+                            seed: seed,
+                            affiliation: affiliation,
+                            position: bulkPlayers.length + 1
+                        });
+                    }
+                }
+
+                if (bulkPlayers.length === 0) {
+                    showError('有効な選手データが見つかりません。');
+                    return;
+                }
+
+                if (bulkPlayers.length > 99) {
+                    showError('選手数が上限（99人）を超えています。');
+                    return;
+                }
+
+                // 参加者上限を自動調整
+                const requiredCapacity = Math.max(
+                    parseInt(document.getElementById('playerCount').value),
+                    bulkPlayers.length
+                );
+                
+                const capacityOptions = [4, 8, 16, 32, 48, 64, 99];
+                const newCapacity = capacityOptions.find(cap => cap >= requiredCapacity) || 99;
+                
+                document.getElementById('playerCount').value = newCapacity;
+
+                // playersを更新
+                players = [...bulkPlayers];
+                
+                // 不足分は空のプレイヤーで埋める
+                while (players.length < newCapacity) {
+                    players.push({
+                        id: players.length + 1,
+                        name: '',
+                        seed: 0,
+                        affiliation: '',
+                        position: players.length + 1
+                    });
+                }
+
+                updatePlayerInputs();
+                updatePlayerCountDisplay();
+                showSuccess(`${bulkPlayers.length}名の選手データを読み込みました！`);
+
+            } catch (error) {
+                console.error('一括入力エラー:', error);
+                showError('一括入力の処理中にエラーが発生しました: ' + error.message);
+            }
+        }
+
+        // テンプレートダウンロード機能
+        function downloadTemplate() {
+            try {
+                const templateData = [
+                    ['選手名', 'シード番号', '所属'],
+                    ['田中太郎', 1, 'A大学'],
+                    ['佐藤花子', 2, 'B高校'],
+                    ['山田次郎', '', 'C会社'],
+                    ['鈴木一郎', 3, 'D会社'],
+                    ['高橋美香', 0, 'E高校'],
+                    ['渡辺健太', 4, 'F大学'],
+                    ['中村優子', '', 'G会社'],
+                    ['小林大輔', '', 'H大学']
+                ];
+
+                const ws = XLSX.utils.aoa_to_sheet(templateData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, '選手リスト');
+
+                // 列幅を調整
+                ws['!cols'] = [
+                    { wch: 15 }, // 選手名
+                    { wch: 12 }, // シード番号
+                    { wch: 15 }  // 所属
+                ];
+
+                XLSX.writeFile(wb, 'スカッシュ大会_選手リストテンプレート.xlsx');
+                showSuccess('テンプレートファイルをダウンロードしました！');
+
+            } catch (error) {
+                console.error('テンプレートダウンロードエラー:', error);
+                showError('テンプレートのダウンロード中にエラーが発生しました: ' + error.message);
+            }
+        }
 
         function shareOnMobile() {
             try {
@@ -638,34 +1129,55 @@
                 
                 grid.innerHTML = '';
 
-                // players配列を初期化
-                players = [];
+                // players配列のサイズを調整
+                while (players.length < count) {
+                    players.push({
+                        id: players.length + 1,
+                        name: '',
+                        seed: 0,
+                        affiliation: '',
+                        position: players.length + 1
+                    });
+                }
+                
+                // 上限を超えた分を削除
+                if (players.length > count) {
+                    players = players.slice(0, count);
+                }
                 
                 for (let i = 1; i <= count; i++) {
                     const playerDiv = document.createElement('div');
                     playerDiv.className = 'player-input';
+                    
+                    const player = players[i - 1] || { name: '', seed: 0, affiliation: '' };
+                    
                     playerDiv.innerHTML = `
                         <span>${i}.</span>
-                        <input type="text" id="player${i}" placeholder="選手名" onchange="updatePlayer(${i})">
-                        <input type="number" id="seed${i}" placeholder="シード" min="0" max="${count}" onchange="updatePlayer(${i})">
-                        <input type="text" id="affiliation${i}" placeholder="所属" onchange="updatePlayer(${i})">
+                        <input type="text" id="player${i}" placeholder="選手名" value="${player.name}" onchange="updatePlayer(${i})">
+                        <input type="number" id="seed${i}" placeholder="シード" min="0" max="${count}" value="${player.seed || ''}" onchange="updatePlayer(${i})">
+                        <input type="text" id="affiliation${i}" placeholder="所属" value="${player.affiliation}" onchange="updatePlayer(${i})">
                     `;
                     grid.appendChild(playerDiv);
-                    
-                    // players配列に要素を追加
-                    players.push({
-                        id: i,
-                        name: '',
-                        seed: 0,
-                        affiliation: '',
-                        position: i
-                    });
                 }
                 
-                console.log('Players初期化完了:', players);
+                updatePlayerCountDisplay();
+                console.log('Players更新完了:', players);
             } catch (error) {
                 console.error('updatePlayerInputsエラー:', error);
                 showError('参加者入力フォームの初期化に失敗しました: ' + error.message);
+            }
+        }
+
+        function updatePlayerCountDisplay() {
+            try {
+                const count = parseInt(document.getElementById('playerCount').value);
+                const filledCount = players.filter(p => p && p.name && p.name.trim() !== '').length;
+                const display = document.getElementById('playerCountDisplay');
+                if (display) {
+                    display.textContent = `現在の参加者数: ${filledCount} / ${count}`;
+                }
+            } catch (error) {
+                console.error('updatePlayerCountDisplayエラー:', error);
             }
         }
 
@@ -696,6 +1208,8 @@
                 } else {
                     console.warn(`Invalid player index: ${index}`);
                 }
+                
+                updatePlayerCountDisplay();
             } catch (error) {
                 console.error(`updatePlayer(${index})エラー:`, error);
             }
@@ -714,6 +1228,10 @@
                 
                 if (this.players.length === 0) {
                     throw new Error('有効な参加者が見つかりません');
+                }
+
+                if (this.players.length > 99) {
+                    throw new Error('参加者数が上限（99人）を超えています');
                 }
                 
                 this.options = {
@@ -946,6 +1464,10 @@
                     throw new Error('最低2名の参加者が必要です。');
                 }
 
+                if (filledPlayers.length > 99) {
+                    throw new Error('参加者数が上限（99人）を超えています。');
+                }
+
                 const options = {
                     seedCorners: document.getElementById('seedCorners').checked,
                     strengthBalance: document.getElementById('strengthBalance').checked,
@@ -986,8 +1508,9 @@
                 
                 const date = document.getElementById('tournamentDate').value;
                 const venue = document.getElementById('venue').value;
+                const filledPlayers = players.filter(p => p && p.name && p.name.trim() !== '');
                 document.getElementById('displayTournamentDetails').textContent = 
-                    `${date ? '開催日: ' + date : ''} ${venue ? '会場: ' + venue : ''} (${drawSize}ドロー)`;
+                    `${date ? '開催日: ' + date : ''} ${venue ? '会場: ' + venue : ''} (${filledPlayers.length}名参加 / ${drawSize}ドロー)`;
 
                 bracketDiv.innerHTML = '';
 
@@ -1002,7 +1525,7 @@
                     roundDiv.className = 'round';
                     
                     const roundTitle = document.createElement('h3');
-                    const roundNames = ['1回戦', '2回戦', '準々決勝', '準決勝', '決勝'];
+                    const roundNames = ['1回戦', '2回戦', '3回戦', '4回戦', '5回戦', '6回戦', '準決勝', '決勝'];
                     roundTitle.textContent = roundNames[roundIndex] || `${roundIndex + 1}回戦`;
                     roundDiv.appendChild(roundTitle);
 
@@ -1151,7 +1674,9 @@
                     }
                 });
 
-                displayTournament(bracket, Math.pow(2, Math.ceil(Math.log2(players.filter(p => p && p.name && p.name.trim() !== '').length))));
+                const filledPlayers = players.filter(p => p && p.name && p.name.trim() !== '');
+                const drawSize = Math.pow(2, Math.ceil(Math.log2(filledPlayers.length)));
+                displayTournament(bracket, drawSize);
                 showSuccess('コート割り当てが完了しました！');
                 
             } catch (error) {
@@ -1208,10 +1733,26 @@
 
         function submitScore() {
             try {
-                if (!currentScoreMatch) return;
+                if (!currentScoreMatch) {
+                    showError('試合データが見つかりません');
+                    return;
+                }
 
-                const score0 = parseInt(document.getElementById('score0').value) || 0;
-                const score1 = parseInt(document.getElementById('score1').value) || 0;
+                if (!currentScoreMatch.players || currentScoreMatch.players.length < 2) {
+                    showError('選手データが正しくありません');
+                    return;
+                }
+
+                const score0Element = document.getElementById('score0');
+                const score1Element = document.getElementById('score1');
+                
+                if (!score0Element || !score1Element) {
+                    showError('スコア入力フィールドが見つかりません');
+                    return;
+                }
+
+                const score0 = parseInt(score0Element.value) || 0;
+                const score1 = parseInt(score1Element.value) || 0;
 
                 if (score0 === score1) {
                     alert('引き分けは認められません。勝者を決定してください。');
@@ -1226,10 +1767,17 @@
                 advanceWinner(currentScoreMatch);
                 
                 // 表示を更新
-                displayTournament(bracket, Math.pow(2, Math.ceil(Math.log2(players.filter(p => p.name.trim() !== '').length))));
+                const filledPlayers = players.filter(p => p && p.name && p.name.trim() !== '');
+                if (filledPlayers.length > 0) {
+                    const drawSize = Math.pow(2, Math.ceil(Math.log2(filledPlayers.length)));
+                    displayTournament(bracket, drawSize);
+                }
+                
+                const winnerName = currentScoreMatch.players[currentScoreMatch.winner] ? 
+                    currentScoreMatch.players[currentScoreMatch.winner].name : '不明';
                 
                 closeScoreModal();
-                showSuccess(`試合結果が保存されました！勝者: ${currentScoreMatch.players[currentScoreMatch.winner].name}`);
+                showSuccess(`試合結果が保存されました！勝者: ${winnerName}`);
             } catch (error) {
                 console.error('submitScoreエラー:', error);
                 showError('スコア保存中にエラーが発生しました: ' + error.message);
@@ -1238,14 +1786,31 @@
 
         function advanceWinner(completedMatch) {
             try {
+                if (!completedMatch || !completedMatch.players || completedMatch.winner === null || completedMatch.winner === undefined) {
+                    console.error('Invalid match data for advancing winner');
+                    return;
+                }
+
                 const winner = completedMatch.players[completedMatch.winner];
+                if (!winner) {
+                    console.error('Winner data not found');
+                    return;
+                }
                 
                 // 次のラウンドを探す
                 for (let roundIndex = 1; roundIndex < bracket.length; roundIndex++) {
                     const round = bracket[roundIndex];
                     
+                    if (!round || !Array.isArray(round)) {
+                        continue;
+                    }
+                    
                     for (let match of round) {
-                        if (match.prevMatches && match.prevMatches.includes(completedMatch)) {
+                        if (!match || !match.prevMatches) {
+                            continue;
+                        }
+                        
+                        if (match.prevMatches.includes(completedMatch)) {
                             // この試合に勝者を進める
                             if (match.players[0] === null) {
                                 match.players[0] = winner;
@@ -1709,8 +2274,16 @@
         window.closeScoreModal = closeScoreModal;
         window.submitScore = submitScore;
         window.shareOnMobile = shareOnMobile;
+        window.switchTab = switchTab;
+        window.switchInputTab = switchInputTab;
+        window.handleFileSelect = handleFileSelect;
+        window.loadFromExcel = loadFromExcel;
+        window.loadFromBulkInput = loadFromBulkInput;
+        window.downloadTemplate = downloadTemplate;
+        window.dragOverHandler = dragOverHandler;
+        window.dragLeaveHandler = dragLeaveHandler;
+        window.dropHandler = dropHandler;
 
     </script>
 </body>
 </html>
-                        
